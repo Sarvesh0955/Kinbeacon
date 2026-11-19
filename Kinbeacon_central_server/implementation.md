@@ -13,7 +13,7 @@
 ```bash
 curl -X POST http://localhost:5000/api/v1/search \
   -H "Content-Type: application/json" \
-  -d '{"device_id": "KINBEACON-PHONE1"}'
+  -d '{"device_id": "kb-phone1"}'
 ```
 
 - The request body contains only `device_id`.
@@ -97,7 +97,7 @@ Guardian App ──POST /api/v1/searches {device_id}──► API layer
 | `zones` | `id`, `name`, `centroid_x/y`, `metadata` | |
 | `zone_adjacency` | `zone_a_id`, `zone_b_id` | Drives conflict checks and search-area expansion |
 | `anchors` | `id`, `anchor_id` (unique), `zone_id` FK, `x`, `y`, `floor`, **`base_url`**, `enabled`, `verified`, `verified_at`, `verify_note`, `health_state` (UP/DEGRADED/DOWN/UNKNOWN), `last_success_at`, `last_failure_at`, `consecutive_failures`, `circuit_open_until`, `clock_offset_ms`, `metadata` | `is_active` is derived: enabled and circuit not open |
-| `devices` | `id`, `device_id` (unique), `display_name`, `guardian_ref`, `status`, `metadata` | Wearable registry, e.g. `KINBEACON-PHONE1` |
+| `devices` | `id`, `device_id` (unique), `display_name`, `guardian_ref`, `status`, `metadata` | Wearable registry, e.g. `kb-phone1` |
 | `searches` | `id` (uuid), `device_id` FK, `requested_by`, `status`, `started_at`, `completed_at`, `anchors_targeted`, `anchors_responded` | Status: RUNNING, COMPLETED, PARTIAL, FAILED |
 | `search_anchor_results` | `search_id`, `anchor_id`, `outcome`, `http_status`, `latency_ms`, `sightings_count`, `dropped_count`, `error` | Outcome: OK, EMPTY, TIMEOUT, ERROR, SKIPPED |
 | `sightings` | `search_id`, `anchor_id`, `device_id`, `observed_at`, `rssi` | Index `(search_id, observed_at)`; dedupe key `(anchor_id, device_id, observed_at)` |
@@ -125,7 +125,7 @@ Sample from the simulator:
 ```
 200 OK
 { "anchor_id": "ANCHOR-LAPTOP-01",
-  "device_id": "KINBEACON-PHONE1",
+  "device_id": "kb-phone1",
   "record_count": 3,
   "records": [ { "rssi": -58, "timestamp": "2026-11-19T00:15:30.123Z" }, ... ] }
 ```
@@ -295,9 +295,9 @@ All constants are config-driven. Defaults are starting points to tune against si
 - Open the port in each laptop's firewall (ideally only to the server's IP).
 - Use a router with Wi-Fi client isolation **off**; avoid campus or corporate networks that block device-to-device traffic.
 - Keep laptops awake and plugged in; sleep makes an anchor TIMEOUT, which is a good failure-mode demo.
-- Test from the server machine first: `curl -X POST http://<anchor-ip>:5000/api/v1/search -H "Content-Type: application/json" -d '{"device_id": "KINBEACON-PHONE1"}'`. If that works, the server's call will too.
+- Test from the server machine first: `curl -X POST http://<anchor-ip>:5000/api/v1/search -H "Content-Type: application/json" -d '{"device_id": "kb-phone1"}'`. If that works, the server's call will too.
 - Sync clocks with NTP on all machines.
-- Register wearables using the exact BLE advertised name (e.g. `KINBEACON-PHONE1`). The anchor matches on that name, so the server's `device_id` must equal it, including the `KINBEACON-` prefix.
+- Register wearables using the exact BLE advertised name (e.g. `kb-phone1`). The anchor matches on that name, so the server's `device_id` must equal it, including the `kb-` prefix.
 - Use real BLE for the live demo. For repeatable zone-accuracy tests, use `--mock` with a deterministic scenario, if the mock generator can be made seedable.
 
 ---
@@ -326,7 +326,7 @@ All constants are config-driven. Defaults are starting points to tune against si
       "zone_id": 1, "x": 10, "y": 10, "floor": 0, "enabled": true }
   ],
   "devices": [
-    { "device_id": "KINBEACON-PHONE1", "display_name": "Demo phone 1" }
+    { "device_id": "kb-phone1", "display_name": "Demo phone 1" }
   ]
 }
 ```

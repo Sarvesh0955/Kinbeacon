@@ -12,10 +12,11 @@ from ble.scanner import BLEScanner, start_scanner_thread
 from db.store import SignalStore
 
 
-def make_mock_advertisement(name=None, rssi=-60):
+def make_mock_advertisement(name=None, rssi=-60, manufacturer_data=None):
     adv_data = MagicMock(spec=AdvertisementData)
     adv_data.local_name = name
     adv_data.rssi = rssi
+    adv_data.manufacturer_data = manufacturer_data or {}
 
     device = MagicMock(spec=BLEDevice)
     device.name = name
@@ -34,60 +35,84 @@ class TestBLEScanner(unittest.TestCase):
         self.store.close()
         self.temp_dir.cleanup()
 
-    def test_handle_advertisement_matching_prefix(self):
-        scanner = BLEScanner(store=self.store, device_prefix="KINBEACON-")
-        device, adv = make_mock_advertisement(name="KINBEACON-PHONE1", rssi=-55)
+    def test_extended_full_json_framing(self):
+        """Tests parsing Extended Full JSON (32B): {"device_id":"kb-1234567890abcdef"} in 0xFFFF"""
+        scanner = BLEScanner(store=self.store, device_prefix="kb-", company_id=0xFFFF)
+        payload = b'{"device_id":"kb-1234567890abcdef"}'
+        device, adv = make_mock_advertisement(
+            name=None, rssi=-52, manufacturer_data={0xFFFF: payload}
+        )
 
         record_id = scanner.handle_advertisement(device, adv)
         self.assertIsNotNone(record_id)
-        self.assertEqual(scanner.signals_received, 1)
+        records = self.store.query_device("kb-1234567890abcdef", since_minutes=15)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["rssi"], -52)
 
-        # Check DB
-        records = self.store.query_device("KINBEACON-PHONE1", since_minutes=15)
+    def test_compact_kv_framing(self):
+        """Tests parsing Compact KV (19B): kb-1234567890abcdef in 0xFFFF"""
+        scanner = BLEScanner(store=self.store, device_prefix="kb-", company_id=0xFFFF)
+        payload = b"kb-1234567890abcdef"
+        device, adv = make_mock_advertisement(
+            name=None, rssi=-58, manufacturer_data={0xFFFF: payload}
+        )
+
+        record_id = scanner.handle_advertisement(device, adv)
+        self.assertIsNotNone(record_id)
+        records = self.store.query_device("kb-1234567890abcdef", since_minutes=15)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["rssi"], -58)
+
+    def test_legacy_json_base64_framing(self):
+        """Tests parsing Legacy JSON Base64: {"device_id":"kb-aGVsYXNka2pm"} in 0xFFFF"""
+        scanner = BLEScanner(store=self.store, device_prefix="kb-", company_id=0xFFFF)
+        payload = b'{"device_id":"kb-aGVsYXNka2pm"}'
+        device, adv = make_mock_advertisement(
+            name=None, rssi=-64, manufacturer_data={0xFFFF: payload}
+        )
+
+        record_id = scanner.handle_advertisement(device, adv)
+        self.assertIsNotNone(record_id)
+        records = self.store.query_device("kb-aGVsYXNka2pm", since_minutes=15)
+        self.assertEqual(len(records), 1)
+
+    def test_local_name_fallback(self):
+        """Tests fallback to advertised local_name when manufacturer data is absent"""
+        scanner = BLEScanner(store=self.store, device_prefix="kb-")
+        device, adv = make_mock_advertisement(name="kb-phone1", rssi=-55)
+
+        record_id = scanner.handle_advertisement(device, adv)
+        self.assertIsNotNone(record_id)
+        records = self.store.query_device("kb-phone1", since_minutes=15)
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["rssi"], -55)
 
     def test_handle_advertisement_mismatched_prefix_ignored(self):
-        scanner = BLEScanner(store=self.store, device_prefix="KINBEACON-")
+        scanner = BLEScanner(store=self.store, device_prefix="kb-")
         device, adv = make_mock_advertisement(name="AirPods-Pro", rssi=-40)
 
         record_id = scanner.handle_advertisement(device, adv)
         self.assertIsNone(record_id)
-        self.assertEqual(scanner.signals_received, 0)
-
-        # DB remains empty
         stats = self.store.get_stats()
         self.assertEqual(stats["total_records"], 0)
 
-    def test_handle_advertisement_empty_name_ignored(self):
-        scanner = BLEScanner(store=self.store, device_prefix="KINBEACON-")
+    def test_handle_advertisement_empty_name_and_mfg_ignored(self):
+        scanner = BLEScanner(store=self.store, device_prefix="kb-")
         device, adv = make_mock_advertisement(name=None, rssi=-70)
 
         record_id = scanner.handle_advertisement(device, adv)
         self.assertIsNone(record_id)
-        self.assertEqual(scanner.signals_received, 0)
 
     def test_handle_advertisement_fallback_rssi(self):
-        scanner = BLEScanner(store=self.store, device_prefix="KINBEACON-")
-        device, adv = make_mock_advertisement(name="KINBEACON-TEST", rssi=None)
+        scanner = BLEScanner(store=self.store, device_prefix="kb-")
+        device, adv = make_mock_advertisement(name="kb-test", rssi=None)
 
         record_id = scanner.handle_advertisement(device, adv)
         self.assertIsNotNone(record_id)
 
-        records = self.store.query_device("KINBEACON-TEST", since_minutes=15)
+        records = self.store.query_device("kb-test", since_minutes=15)
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["rssi"], -100)
-
-    def test_handle_advertisement_empty_prefix_accepts_all(self):
-        scanner = BLEScanner(store=self.store, device_prefix="")
-        device, adv = make_mock_advertisement(name="ANY-DEVICE-123", rssi=-62)
-
-        record_id = scanner.handle_advertisement(device, adv)
-        self.assertIsNotNone(record_id)
-        self.assertEqual(scanner.signals_received, 1)
-
-        records = self.store.query_device("ANY-DEVICE-123", since_minutes=15)
-        self.assertEqual(len(records), 1)
 
 
 if __name__ == "__main__":

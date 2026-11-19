@@ -43,17 +43,17 @@ async def test_zone_crud(client: AsyncClient):
 async def test_device_crud(client: AsyncClient):
     resp = await client.post(
         "/api/v1/devices",
-        json={"device_id": "KINBEACON-PHONE1", "display_name": "Test Phone"},
+        json={"device_id": "kb-phone1", "display_name": "Test Phone"},
     )
     assert resp.status_code == 201
-    assert resp.json()["device_id"] == "KINBEACON-PHONE1"
+    assert resp.json()["device_id"] == "kb-phone1"
 
-    get_resp = await client.get("/api/v1/devices/KINBEACON-PHONE1")
+    get_resp = await client.get("/api/v1/devices/kb-phone1")
     assert get_resp.status_code == 200
     assert get_resp.json()["display_name"] == "Test Phone"
 
     # Soft delete
-    del_resp = await client.delete("/api/v1/devices/KINBEACON-PHONE1")
+    del_resp = await client.delete("/api/v1/devices/kb-phone1")
     assert del_resp.status_code == 204
 
 
@@ -137,12 +137,12 @@ async def test_searches_workflow(client: AsyncClient, mock_transport):
     )
     await client.post(
         "/api/v1/devices",
-        json={"device_id": "KINBEACON-PHONE1", "display_name": "Phone 1"},
+        json={"device_id": "kb-phone1", "display_name": "Phone 1"},
     )
 
     # 3. Search when device not detected (EMPTY)
     resp_empty = await client.post(
-        "/api/v1/searches", json={"device_id": "KINBEACON-PHONE1"}
+        "/api/v1/searches", json={"device_id": "kb-phone1"}
     )
     assert resp_empty.status_code == 200
     empty_data = resp_empty.json()
@@ -161,7 +161,7 @@ async def test_searches_workflow(client: AsyncClient, mock_transport):
     )
 
     resp_sighting = await client.post(
-        "/api/v1/searches", json={"device_id": "KINBEACON-PHONE1"}
+        "/api/v1/searches", json={"device_id": "kb-phone1"}
     )
     assert resp_sighting.status_code == 200
     sighting_data = resp_sighting.json()
@@ -178,7 +178,7 @@ async def test_searches_workflow(client: AsyncClient, mock_transport):
     assert resp_get.json()["search_id"] == search_id
 
     # 6. Fetch search history for device
-    resp_history = await client.get("/api/v1/devices/KINBEACON-PHONE1/searches")
+    resp_history = await client.get("/api/v1/devices/kb-phone1/searches")
     assert resp_history.status_code == 200
     assert len(resp_history.json()) >= 2
 

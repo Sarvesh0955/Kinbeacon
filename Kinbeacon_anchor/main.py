@@ -16,7 +16,7 @@ logger = setup_logger("main")
 
 
 def start_mock_ble_thread(
-    store: SignalStore, stop_event: threading.Event, prefix: str = "KINBEACON-"
+    store: SignalStore, stop_event: threading.Event, prefix: str = config.DEVICE_PREFIX
 ) -> threading.Thread:
     """Simulates incoming BLE advertisements for offline demonstrations."""
 
@@ -25,7 +25,7 @@ def start_mock_ble_thread(
             "[MOCK MODE] Simulating incoming BLE advertisements for devices with prefix '%s'...",
             prefix,
         )
-        mock_devices = [f"{prefix}PHONE1", f"{prefix}PHONE2", f"{prefix}WEARABLE3"]
+        mock_devices = [f"{prefix}phone1", f"{prefix}phone2", f"{prefix}wearable3"]
         while not stop_event.is_set():
             device_id = random.choice(mock_devices)
             rssi = random.randint(-85, -45)
@@ -65,6 +65,12 @@ def main():
         "--prefix",
         default=config.DEVICE_PREFIX,
         help=f"BLE advertisement name prefix filter (default: {config.DEVICE_PREFIX})",
+    )
+    parser.add_argument(
+        "--company-id",
+        type=lambda x: int(x, 0),
+        default=config.COMPANY_ID,
+        help=f"Company ID for BLE Manufacturer Data (default: 0x{config.COMPANY_ID:04X} / {config.COMPANY_ID})",
     )
     parser.add_argument(
         "--anchor-id",
@@ -123,7 +129,10 @@ def main():
         )
     else:
         ble_thread, scanner = start_scanner_thread(
-            store=store, stop_event=stop_event, device_prefix=args.prefix
+            store=store,
+            stop_event=stop_event,
+            device_prefix=args.prefix,
+            company_id=args.company_id,
         )
 
     # 4. Create Flask API App

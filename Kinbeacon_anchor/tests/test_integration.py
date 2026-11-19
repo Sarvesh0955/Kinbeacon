@@ -22,7 +22,7 @@ class TestEndToEndPipeline(unittest.TestCase):
         self.store = SignalStore(db_path=self.db_path)
         self.store.init_db()
 
-        self.scanner = BLEScanner(store=self.store, device_prefix="KINBEACON-")
+        self.scanner = BLEScanner(store=self.store, device_prefix="kb-")
         self.scheduler = PurgeScheduler(
             store=self.store, retention_minutes=15, interval_seconds=0.1
         )
@@ -49,13 +49,13 @@ class TestEndToEndPipeline(unittest.TestCase):
 
     def test_full_pipeline_ingest_query_and_purge(self):
         # 1. Simulate incoming BLE advertisements from Phone 1
-        rec1 = self._simulate_ble_packet("KINBEACON-PHONE1", -58)
-        rec2 = self._simulate_ble_packet("KINBEACON-PHONE1", -61)
+        rec1 = self._simulate_ble_packet("kb-phone1", -58)
+        rec2 = self._simulate_ble_packet("kb-phone1", -61)
         self.assertIsNotNone(rec1)
         self.assertIsNotNone(rec2)
 
         # 2. Simulate incoming BLE advertisements from Phone 2
-        rec3 = self._simulate_ble_packet("KINBEACON-PHONE2", -75)
+        rec3 = self._simulate_ble_packet("kb-phone2", -75)
         self.assertIsNotNone(rec3)
 
         # 3. Simulate another non-kinbeacon device (e.g. mouse or TV)
@@ -65,12 +65,12 @@ class TestEndToEndPipeline(unittest.TestCase):
         # 4. Backend searches for Phone 1 via REST API
         resp1 = self.client.post(
             "/api/v1/search",
-            data=json.dumps({"device_id": "KINBEACON-PHONE1"}),
+            data=json.dumps({"device_id": "kb-phone1"}),
             content_type="application/json",
         )
         self.assertEqual(resp1.status_code, 200)
         data1 = resp1.get_json()
-        self.assertEqual(data1["device_id"], "KINBEACON-PHONE1")
+        self.assertEqual(data1["device_id"], "kb-phone1")
         self.assertEqual(data1["anchor_id"], "TEST-ANCHOR-E2E")
         self.assertEqual(data1["record_count"], 2)
         self.assertEqual(len(data1["records"]), 2)
@@ -80,7 +80,7 @@ class TestEndToEndPipeline(unittest.TestCase):
         # 5. Backend searches for non-existent device
         resp2 = self.client.post(
             "/api/v1/search",
-            data=json.dumps({"device_id": "KINBEACON-UNKNOWN"}),
+            data=json.dumps({"device_id": "kb-unknown"}),
             content_type="application/json",
         )
         self.assertEqual(resp2.status_code, 200)
@@ -92,7 +92,7 @@ class TestEndToEndPipeline(unittest.TestCase):
         expired_ts = (
             datetime.now(timezone.utc) - timedelta(minutes=20)
         ).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-        self.store.insert_signal("KINBEACON-PHONE1", -99, timestamp=expired_ts)
+        self.store.insert_signal("kb-phone1", -99, timestamp=expired_ts)
 
         # Wait briefly for scheduler to purge
         time.sleep(0.25)
@@ -100,7 +100,7 @@ class TestEndToEndPipeline(unittest.TestCase):
         # Verify expired record is purged from both search and database
         resp3 = self.client.post(
             "/api/v1/search",
-            data=json.dumps({"device_id": "KINBEACON-PHONE1"}),
+            data=json.dumps({"device_id": "kb-phone1"}),
             content_type="application/json",
         )
         data3 = resp3.get_json()

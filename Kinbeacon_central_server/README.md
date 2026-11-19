@@ -37,5 +37,5 @@ Interactive API documentation is available at:
 
 2. **Run device search demo:**
 ```bash
-./venv/bin/python scripts/run_demo.py --device KINBEACON-PHONE1
+./venv/bin/python scripts/run_demo.py --device kb-phone1
 ```

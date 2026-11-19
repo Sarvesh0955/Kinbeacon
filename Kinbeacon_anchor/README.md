@@ -7,7 +7,7 @@ A lightweight, robust BLE Anchor simulation running on a laptop (macOS/Linux/Win
 ## Features
 
 - **Continuous Real BLE Scanning:** Scans actual BLE advertisements via [Bleak](https://github.com/hbldh/bleak) on a dedicated asynchronous thread.
-- **Prefix-Based Filtering:** Focuses specifically on target devices (e.g., prefix `KINBEACON-`), avoiding noise from incidental Bluetooth peripherals.
+- **Prefix-Based Filtering:** Focuses specifically on target devices (e.g., prefix `kb-`), avoiding noise from incidental Bluetooth peripherals.
 - **Thread-Safe Local Storage:** SQLite with WAL (Write-Ahead Logging) mode and compound indexing (`device_id`, `timestamp`) for high concurrency and sub-millisecond query latency.
 - **15-Minute Rolling Window:** Background scheduler periodically purges records older than 15 minutes while queries automatically enforce the cutoff window.
 - **REST API Endpoints:** Clean JSON endpoints for device search (`/api/v1/search`), anchor health & stats (`/api/v1/status`), and cataloging seen devices (`/api/v1/devices`).
@@ -20,7 +20,7 @@ A lightweight, robust BLE Anchor simulation running on a laptop (macOS/Linux/Win
 ```
                       +-----------------------------------+
                       |   Smartphones (Custom BLE Apps)   |
-                      |   Advertising: "KINBEACON-PHONE1" |
+                      |   Advertising: "kb-phone1" |
                       +-----------------+-----------------+
                                         | (BLE 2.4 GHz)
                                         v
@@ -47,7 +47,7 @@ A lightweight, robust BLE Anchor simulation running on a laptop (macOS/Linux/Win
 +----------------------------------------|---------------------------------------+
                                          ^
                                          | HTTP POST /api/v1/search
-                                         | { "device_id": "KINBEACON-PHONE1" }
+                                         | { "device_id": "kb-phone1" }
                                          v
                       +-----------------------------------+
                       |          Backend Server           |
@@ -88,7 +88,7 @@ python3 main.py --mock
 ```bash
 python3 main.py \
   --anchor-id ANCHOR-LAB-01 \
-  --prefix KINBEACON- \
+  --prefix kb- \
   --port 5000 \
   --retention 15 \
   --db ble_signals.db
@@ -101,7 +101,7 @@ python3 main.py \
 | `--host` | `API_HOST` | `0.0.0.0` | API bind address |
 | `--port` | `API_PORT` | `5000` | API port |
 | `--db` | `DB_PATH` | `ble_signals.db` | Path to SQLite database file |
-| `--prefix` | `DEVICE_PREFIX` | `KINBEACON-` | Filter prefix for BLE advertised names |
+| `--prefix` | `DEVICE_PREFIX` | `kb-` | Filter prefix for BLE advertised names |
 | `--anchor-id` | `ANCHOR_ID` | `ANCHOR-LAPTOP-01` | Unique anchor identity identifier |
 | `--retention` | `RETENTION_MINUTES` | `15` | Rolling window retention in minutes |
 | `--purge-interval` | `PURGE_INTERVAL_SECONDS`| `60` | Periodic database purge check interval |
@@ -121,7 +121,7 @@ Returns all signal records received for a specific device within the rolling 15-
 #### Request Body
 ```json
 {
-  "device_id": "KINBEACON-PHONE1"
+  "device_id": "kb-phone1"
 }
 ```
 
@@ -129,7 +129,7 @@ Returns all signal records received for a specific device within the rolling 15-
 ```json
 {
   "anchor_id": "ANCHOR-LAPTOP-01",
-  "device_id": "KINBEACON-PHONE1",
+  "device_id": "kb-phone1",
   "record_count": 3,
   "records": [
     {
@@ -152,7 +152,7 @@ Returns all signal records received for a specific device within the rolling 15-
 ```json
 {
   "anchor_id": "ANCHOR-LAPTOP-01",
-  "device_id": "KINBEACON-UNKNOWN",
+  "device_id": "kb-unknown",
   "record_count": 0,
   "records": []
 }
@@ -162,7 +162,7 @@ Returns all signal records received for a specific device within the rolling 15-
 ```bash
 curl -X POST http://localhost:5000/api/v1/search \
   -H "Content-Type: application/json" \
-  -d '{"device_id": "KINBEACON-PHONE1"}'
+  -d '{"device_id": "kb-phone1"}'
 ```
 
 ---
@@ -202,12 +202,12 @@ Lists all devices currently tracked in the database along with their last seen t
 {
   "devices": [
     {
-      "device_id": "KINBEACON-PHONE1",
+      "device_id": "kb-phone1",
       "last_seen": "2026-11-19T00:16:45.789Z",
       "record_count": 89
     },
     {
-      "device_id": "KINBEACON-PHONE2",
+      "device_id": "kb-phone2",
       "last_seen": "2026-11-19T00:15:20.100Z",
       "record_count": 53
     }
@@ -220,7 +220,7 @@ Lists all devices currently tracked in the database along with their last seen t
 ## Mobile Advertiser Setup (Smartphone Side)
 
 The anchor requires smartphones to broadcast BLE advertisements. Your custom mobile app should configure:
-1. **Advertising Data (Local Name):** Set the Complete Local Name to start with the configured prefix, e.g. `KINBEACON-PHONE1` or `KINBEACON-USER42`.
+1. **Advertising Data (Local Name):** Set the Complete Local Name to start with the configured prefix, e.g. `kb-phone1` or `kb-user42`.
 2. **Advertising Mode:** Non-connectable or connectable undirected advertising.
 3. **Interval:** Recommended ~100 ms – 500 ms for reliable indoor detection.
 

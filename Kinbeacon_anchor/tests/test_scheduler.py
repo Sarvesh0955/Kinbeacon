@@ -39,8 +39,8 @@ class TestPurgeScheduler(unittest.TestCase):
         old_ts = (
             datetime.now(timezone.utc) - timedelta(minutes=20)
         ).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-        self.store.insert_signal("KINBEACON-OLD", -80, timestamp=old_ts)
-        self.store.insert_signal("KINBEACON-FRESH", -50)
+        self.store.insert_signal("kb-old", -80, timestamp=old_ts)
+        self.store.insert_signal("kb-fresh", -50)
 
         self.assertEqual(self.store.get_stats()["total_records"], 2)
 
@@ -57,7 +57,7 @@ class TestPurgeScheduler(unittest.TestCase):
         # Check DB: old record should be deleted, fresh preserved
         stats = self.store.get_stats()
         self.assertEqual(stats["total_records"], 1)
-        remaining = self.store.query_device("KINBEACON-FRESH", since_minutes=15)
+        remaining = self.store.query_device("kb-fresh", since_minutes=15)
         self.assertEqual(len(remaining), 1)
 
 

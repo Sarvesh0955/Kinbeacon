@@ -32,18 +32,18 @@ class TestAnchorAPI(unittest.TestCase):
 
     def test_search_existing_device(self):
         # Insert test records
-        self.store.insert_signal("KINBEACON-PHONE1", -58)
-        self.store.insert_signal("KINBEACON-PHONE1", -62)
-        self.store.insert_signal("KINBEACON-OTHER", -75)
+        self.store.insert_signal("kb-phone1", -58)
+        self.store.insert_signal("kb-phone1", -62)
+        self.store.insert_signal("kb-other", -75)
 
         response = self.client.post(
             "/api/v1/search",
-            data=json.dumps({"device_id": "KINBEACON-PHONE1"}),
+            data=json.dumps({"device_id": "kb-phone1"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
-        self.assertEqual(data["device_id"], "KINBEACON-PHONE1")
+        self.assertEqual(data["device_id"], "kb-phone1")
         self.assertEqual(data["anchor_id"], "TEST-ANCHOR-01")
         self.assertEqual(data["record_count"], 2)
         self.assertEqual(len(data["records"]), 2)
@@ -53,12 +53,12 @@ class TestAnchorAPI(unittest.TestCase):
     def test_search_non_existent_device_returns_empty(self):
         response = self.client.post(
             "/api/v1/search",
-            data=json.dumps({"device_id": "KINBEACON-NOTFOUND"}),
+            data=json.dumps({"device_id": "kb-notfound"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
-        self.assertEqual(data["device_id"], "KINBEACON-NOTFOUND")
+        self.assertEqual(data["device_id"], "kb-notfound")
         self.assertEqual(data["record_count"], 0)
         self.assertEqual(data["records"], [])
 
@@ -93,11 +93,11 @@ class TestAnchorAPI(unittest.TestCase):
         stale_ts = (
             datetime.now(timezone.utc) - timedelta(minutes=20)
         ).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-        self.store.insert_signal("KINBEACON-STALE", -80, timestamp=stale_ts)
+        self.store.insert_signal("kb-stale", -80, timestamp=stale_ts)
 
         response = self.client.post(
             "/api/v1/search",
-            data=json.dumps({"device_id": "KINBEACON-STALE"}),
+            data=json.dumps({"device_id": "kb-stale"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -106,8 +106,8 @@ class TestAnchorAPI(unittest.TestCase):
         self.assertEqual(data["records"], [])
 
     def test_status_endpoint(self):
-        self.store.insert_signal("KINBEACON-1", -60)
-        self.store.insert_signal("KINBEACON-2", -70)
+        self.store.insert_signal("kb-1", -60)
+        self.store.insert_signal("kb-2", -70)
 
         response = self.client.get("/api/v1/status")
         self.assertEqual(response.status_code, 200)
@@ -119,9 +119,9 @@ class TestAnchorAPI(unittest.TestCase):
         self.assertGreaterEqual(data["uptime_seconds"], 0)
 
     def test_devices_endpoint(self):
-        self.store.insert_signal("KINBEACON-DEV1", -50)
-        self.store.insert_signal("KINBEACON-DEV1", -52)
-        self.store.insert_signal("KINBEACON-DEV2", -65)
+        self.store.insert_signal("kb-dev1", -50)
+        self.store.insert_signal("kb-dev1", -52)
+        self.store.insert_signal("kb-dev2", -65)
 
         response = self.client.get("/api/v1/devices")
         self.assertEqual(response.status_code, 200)

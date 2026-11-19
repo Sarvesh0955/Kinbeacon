@@ -11,7 +11,7 @@ import urllib.request
 
 def main():
     parser = argparse.ArgumentParser(description="Run KinBeacon device search demo")
-    parser.add_argument("--device", default="KINBEACON-PHONE1", help="Device ID to search for")
+    parser.add_argument("--device", default="kb-phone1", help="Device ID to search for")
     parser.add_argument("--server", default="http://localhost:8000", help="Central server base URL")
     args = parser.parse_args()
 
