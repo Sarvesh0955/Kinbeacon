@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { executeSearch, listDevices } from '../api/endpoints';
 import { PageHeader, LoadingSpinner } from '../components/common/UIFeedback';
-import { ConfidenceBadge } from '../components/common/ConfidenceBadge';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { SearchResponse } from '../api/types';
 import { getErrorMessage } from '../api/client';
@@ -211,13 +210,6 @@ export const SearchPage: React.FC = () => {
                   <span className="font-mono text-indigo-600">{searchResult.device_id}</span>
                   <StatusBadge status={searchResult.status} />
                 </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <ConfidenceBadge
-                  confidence={searchResult.confidence}
-                  label={searchResult.confidence_label}
-                />
               </div>
             </div>
 

@@ -4,7 +4,6 @@ import { History, MapPin, Eye, Layers } from 'lucide-react';
 import { getDeviceSearches, getSearch, listDevices } from '../api/endpoints';
 import { PageHeader, LoadingSpinner, EmptyState, ErrorBanner } from '../components/common/UIFeedback';
 import { Modal } from '../components/common/Modal';
-import { ConfidenceBadge } from '../components/common/ConfidenceBadge';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { getErrorMessage } from '../api/client';
 import toast from 'react-hot-toast';
@@ -116,7 +115,6 @@ export const HistoryPage: React.FC = () => {
                   <th className="px-4 py-3">Search UUID</th>
                   <th className="px-4 py-3">Timestamp</th>
                   <th className="px-4 py-3">Detected Zone</th>
-                  <th className="px-4 py-3">Confidence</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Flags</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -144,12 +142,6 @@ export const HistoryPage: React.FC = () => {
                       ) : (
                         <span className="text-xs text-slate-400 italic">Not detected</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <ConfidenceBadge
-                        confidence={s.confidence}
-                        label={s.confidence_label}
-                      />
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={s.status} />
@@ -215,25 +207,12 @@ export const HistoryPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 border border-slate-200 rounded-lg">
-                  <span className="text-xs text-slate-400 uppercase font-semibold block">
-                    Resolved Zone
-                  </span>
-                  <div className="text-base font-bold text-slate-900 mt-1">
-                    {detailData.zone ? detailData.zone.name : 'None (NOT_SEEN)'}
-                  </div>
-                </div>
-                <div className="p-3 border border-slate-200 rounded-lg">
-                  <span className="text-xs text-slate-400 uppercase font-semibold block">
-                    Confidence
-                  </span>
-                  <div className="mt-1">
-                    <ConfidenceBadge
-                      confidence={detailData.confidence}
-                      label={detailData.confidence_label}
-                    />
-                  </div>
+              <div className="p-3 border border-slate-200 rounded-lg">
+                <span className="text-xs text-slate-400 uppercase font-semibold block">
+                  Resolved Zone
+                </span>
+                <div className="text-base font-bold text-slate-900 mt-1">
+                  {detailData.zone ? detailData.zone.name : 'None (NOT_SEEN)'}
                 </div>
               </div>
 

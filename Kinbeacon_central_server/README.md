@@ -1,44 +1,51 @@
 # KinBeacon Central Server
 
-The central orchestration server for the **KinBeacon** indoor localization and safety system. It manages the venue registry (zones, anchors, and registered wearable devices), initiates search fan-outs across distributed Bluetooth anchors, aggregates and filters signal sightings, and calculates accurate zone estimates with confidence scoring.
+The central orchestration backend for the **KinBeacon** indoor localization and venue safety system. Built with **FastAPI**, **SQLAlchemy (Async)**, and **httpx**, it manages the venue registry (zones, anchors, and registered wearable beacons), coordinates concurrent async search fan-outs across distributed Bluetooth anchors, aggregates and filters signal sightings, and calculates accurate zone estimates with multi-factor confidence scoring.
 
 ---
 
 ## Architecture Overview
 
 ```
- [Anchor Laptop 1 :5000] ──┐
- [Anchor Laptop 2 :5000] ──┼── Private Venue LAN ──── [Central Server :8000]
- [Anchor Laptop N :500x] ──┘                                 │
-                                                  Guardian App / Staff Dashboard
+ [Anchor Node 1 :8080] ──────┐
+ [Anchor Node 2 :5001] ──────┼── Venue LAN / DevTunnels / ngrok ──── [Central Server :8000]
+ [Anchor Node N :xxxx] ──────┘                                              │
+                                                                    REST API / JSON
+                                                                            │
+                       +────────────────────────────────────────────────────┴───────────────────────────────────────+
+                       │                                                                                           │
+                       v                                                                                           v
+        [KinBeacon Operator Dashboard :3000]                                                      [Mobile Registration API]
+             (React 18 + Vite + Tailwind)                                                             (Android Devices)
 ```
 
-- **Communication Direction:** Pull-based. The central server initiates HTTP calls to each anchor's configured `base_url` (`POST /api/v1/search` and `GET /api/v1/status`). Anchors are passive HTTP servers and do not connect back to the server.
-- **Source of Truth:** The central server's registry is the sole source of truth for anchor network locations, physical coordinates, and assigned zones.
+- **Communication Direction:** Pull-based. The central server initiates HTTP calls to each anchor's configured `base_url` (`POST /api/v1/search` and `GET /api/v1/status`). Anchors are passive HTTP servers and do not push sightings back to the server.
+- **Source of Truth:** The central server's database is the authoritative source of truth for anchor network locations, physical coordinates $(x, y, \text{floor})$, assigned zones, and zone adjacency topologies.
 
 ---
 
 ## Current Features
 
 ### 1. Zone & Anchor Registry
-- **Manual Anchor Management:** Anchors are registered with `anchor_id`, `base_url` (LAN IP or hostname), physical coordinates $(x, y, \text{floor})$, and assigned `zone_id`.
-- **Automatic Identity Verification:** On registration or URL update (`PATCH`), the server queries the anchor's `GET /api/v1/status` endpoint to confirm that the physical anchor reports the identical `anchor_id`.
-- **Zone Adjacency Graph:** Configurable adjacency relationships between zones to drive conflict detection and expanding search-area logic.
-- **Device Catalog:** Registry of tracked wearable devices (e.g. `KINBEACON-PHONE1`) with soft-delete capabilities.
+- **Zone Management:** Define physical zones with $(x, y)$ centroids, dimensions, and metadata.
+- **Zone Adjacency Graph:** Configurable bidirectional adjacency relationships between zones to drive conflict detection and search-area expansion when sightings are stale.
+- **Anchor Management:** Anchors are registered with `anchor_id`, `base_url` (LAN IP, port, or tunnel URL), coordinates $(x, y, \text{floor})$, and assigned `zone_id`.
+- **Automatic Identity Verification:** On registration or URL update (`PATCH`), the server queries the anchor's `GET /api/v1/status` endpoint to confirm that the physical anchor is online and reports health telemetry.
+- **Device Catalog:** Registry of tracked wearable devices (e.g. `kb-phone1` or `kb-21a7b9d22bbcb664`) with active/inactive status and soft-delete capabilities.
 
 ### 2. High-Performance Transport Layer
-- **Concurrent Fan-out:** Uses pooled `httpx.AsyncClient` with HTTP keep-alive and bounded semaphore concurrency (up to 200 simultaneous calls).
+- **Concurrent Fan-Out:** Uses pooled `httpx.AsyncClient` with HTTP keep-alive and bounded semaphore concurrency (up to 200 simultaneous calls).
 - **Resilience & Fault Tolerance:**
   - Strict per-call timeouts (0.5 s connect, 2.0 s read).
   - 1-retry on connect errors and 5xx responses.
-  - **Global Deadline Enforcement (5 s):** Unfinished anchor requests are automatically cancelled and marked `TIMEOUT`; searches resolve with whatever data has arrived.
+  - **Global Deadline Enforcement (5.0 s):** Unfinished anchor requests are automatically cancelled and marked `TIMEOUT`; searches resolve with whatever data has arrived.
   - **Circuit Breaker:** Automatically trips after 3 consecutive failures, setting the anchor to `DEGRADED` and cooling down for 30 seconds before retrying.
 
 ### 3. Pure Zone Identification Engine
 Implements a side-effect-free mathematical scoring engine ([app/zoning/engine.py](file:///Users/sarvesh0955/Coding/Kinbeacon/Kinbeacon_central_server/app/zoning/engine.py)):
 - **Exponential Recency Decay:** Sighting weights decay with $w_i = \exp(-\Delta t / \tau)$ where $\tau = 20\,\text{s}$.
 - **Median Filtering:** Applied across consecutive RSSI samples ($\ge 3$) to eliminate transient multipath spikes.
-- **Normalized RSSI Scoring:** RSSI values ($-100$ to $-40$ dBm) map to $[0, 1]$ signal quality $q_a$.
+- **Normalized RSSI Scoring:** RSSI values ($-100$ to $-40$ dBm) map linearly to $[0, 1]$ signal quality $q_a$.
 - **Anchor Score:** $s_a = q_a \cdot r_a \cdot \sqrt{\min(1, n_a / 3)}$, factoring in signal quality, recency $r_a$, and sample count $n_a$.
 - **Zone Scoring:** $Z_z = \sum \text{top-3 } s_a$ among anchors in that zone (preventing anchor-dense zones from dominating by count alone).
 - **Multi-Factor Confidence Metric:**
@@ -58,9 +65,10 @@ Implements a side-effect-free mathematical scoring engine ([app/zoning/engine.py
 - **Fleet Health Prober:** Background async worker periodically (every 15 s) pings all enabled anchors via `GET /api/v1/status` to maintain fleet health states (`UP`, `DEGRADED`, `DOWN`).
 - **TTL Sighting Purge:** Background worker automatically removes historical searches and sightings older than the 15-minute retention window ($900\,\text{s}$).
 
-### 5. Security & Authentication (Phase 6 Hardening)
+### 5. Security & Authentication
 - Optional `X-API-Key` header authentication on all `/api/v1` routes (configurable via `API_KEY` in environment).
 - Optional `X-Anchor-Key` shared-secret forwarding on outbound anchor requests (`ANCHOR_API_KEY`).
+- CORS middleware enabled out of the box for frontend and dashboard access.
 
 ---
 
@@ -107,6 +115,8 @@ All settings can be customized via environment variables or a `.env` file (see [
 | `PER_ANCHOR_READ_TIMEOUT_S`| `2.0` | Read timeout for individual anchor queries |
 | `STALE_FRESH_S` | `30.0` | Threshold in seconds before a sighting is considered stale |
 | `STALE_MAX_S` | `600.0` | Maximum window (10 min) before sighting expires (`NOT_SEEN`) |
+| `HEALTH_PROBE_INTERVAL_S` | `15.0` | Background anchor health prober interval in seconds |
+| `RETENTION_TTL_S` | `900.0` | Retention TTL for past search data (15 minutes) |
 | `API_KEY` | `None` | If set, enforces `X-API-Key` on API requests |
 | `ANCHOR_API_KEY` | `None` | If set, sends `X-Anchor-Key` on outbound requests to anchors |
 
@@ -131,7 +141,7 @@ Run the automated test suite covering pure zone engine calculations, transport e
 ./venv/bin/pytest -v
 ```
 
-All 17 unit and integration tests validate:
+All 17 automated tests validate:
 - Zero sightings $\to$ `NOT_SEEN`
 - High confidence single-zone resolutions
 - Simultaneous conflict flags and penalty factors
@@ -143,7 +153,7 @@ All 17 unit and integration tests validate:
 
 ## Live Simulation Demo
 
-You can run an end-to-end simulation on a single machine using the included Anchor simulator and central server scripts:
+You can run an end-to-end simulation on a single machine using the included Anchor simulator, central server, and web dashboard:
 
 1. **Start the Anchor Simulation App (Terminal 1):**
    ```bash
@@ -154,25 +164,29 @@ You can run an end-to-end simulation on a single machine using the included Anch
 2. **Start the Central Server (Terminal 2):**
    ```bash
    cd Kinbeacon_central_server
-   ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-3. **Seed the Venue (Terminal 3):**
+3. **Start the Operator Dashboard (Terminal 3):**
    ```bash
-   cd Kinbeacon_central_server
-   ./venv/bin/python scripts/seed_venue.py --anchor-url http://localhost:5001
+   cd Kinbeacon_dashboard
+   npm run dev
    ```
 
-4. **Execute Device Search:**
-   ```bash
-   ./venv/bin/python scripts/run_demo.py --device KINBEACON-PHONE1
-   ```
+4. **Seed the Venue & Run Search:**
+   - **From the Dashboard:** Open [http://localhost:3000](http://localhost:3000), click **"Seed Venue"**, and navigate to **"Device Search"** to track `kb-phone1`.
+   - **Or via CLI:**
+     ```bash
+     cd Kinbeacon_central_server
+     ./venv/bin/python scripts/seed_venue.py --anchor-url http://localhost:5001
+     ./venv/bin/python scripts/run_demo.py --device kb-phone1
+     ```
 
 **Sample Output:**
 ```
 ================ KinBeacon Search Result ================
  Search ID:       9bbb5e35-d642-4f74-9ec3-8c81ca28ad23
- Device ID:       KINBEACON-PHONE1
+ Device ID:       kb-phone1
  Status:          COMPLETED
  Winning Zone:    Zone 1 (ID: 1)
  Confidence:      0.5495 [MEDIUM]
