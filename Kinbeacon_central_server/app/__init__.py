@@ -1,0 +1,1 @@
+"""KinBeacon Central Server Application."""
