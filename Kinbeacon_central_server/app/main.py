@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.deps import get_transport
+from app.api.v1.demo import Demo, router as demo_router
 from app.api.v1.router import api_v1_router
 from app.core.config import settings
 from app.core.errors import KinBeaconError
@@ -104,6 +105,8 @@ def create_app() -> FastAPI:
             "version": "1.0.0",
         }
 
+    app.state.demo = Demo()
+    app.include_router(demo_router, prefix=settings.api_prefix)
     app.include_router(api_v1_router, prefix=settings.api_prefix)
 
     return app

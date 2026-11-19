@@ -93,6 +93,10 @@ A native Android application built with **Kotlin** and **Jetpack Compose** that 
 
 ---
 
+## Last-Mile Find Demo
+
+Run the two-phone LAN rehearsal or the live BLE search with the optional tablet relay. See the [setup and rehearsal guide](./LAST_MILE_DEMO.md).
+
 ## Quick Start: End-to-End Local Demo
 
 Run a complete demonstration locally on a single machine:

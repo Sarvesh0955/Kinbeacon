@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -66,17 +68,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        checkPermissions()
-        
         val filter = IntentFilter(KinBeaconAdvertiserService.ACTION_TELEMETRY)
-        val receiverFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            RECEIVER_NOT_EXPORTED
-        } else {
-            0
-        }
-        ContextCompat.registerReceiver(this, telemetryReceiver, filter, receiverFlags)
-
-        CryptoKeyManager.loadSession(this)
+        ContextCompat.registerReceiver(this, telemetryReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         setContent {
             MaterialTheme(
@@ -92,7 +85,39 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    KinBeaconApp()
+                    var role by rememberSaveable { mutableStateOf<DemoRole?>(null) }
+                    var legacy by rememberSaveable { mutableStateOf(false) }
+                    val selected = role
+                    BackHandler(enabled = legacy || selected != null) {
+                        legacy = false
+                        role = null
+                    }
+                    when {
+                        legacy -> {
+                            remember { CryptoKeyManager.loadSession(this@MainActivity) }
+                            LaunchedEffect(Unit) {
+                                checkPermissions()
+                            }
+                            KinBeaconApp()
+                        }
+                        selected != null -> DemoScreen(selected, telemetryRadioState) { role = null }
+                        else -> Column(
+                            Modifier.statusBarsPadding().navigationBarsPadding().padding(24.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text("KinBeacon", style = MaterialTheme.typography.headlineMedium)
+                            Button(onClick = {
+                                if (isBroadcasting) {
+                                    stopService(Intent(this@MainActivity, KinBeaconAdvertiserService::class.java))
+                                    isBroadcasting = false
+                                }
+                                role = DemoRole.WEARABLE
+                            }) { Text("Start Wearable Demo") }
+                            Button(onClick = { role = DemoRole.GUARDIAN }) { Text("Guardian") }
+                            OutlinedButton(onClick = { role = DemoRole.RELAY }) { Text("Attendee Relay") }
+                            TextButton(onClick = { legacy = true }) { Text("Registered Wearable") }
+                        }
+                    }
                 }
             }
         }

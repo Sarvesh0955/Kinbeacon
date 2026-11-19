@@ -1,0 +1,12 @@
+{
+  "name": "Lantern Hall",
+  "zone": "Exhibition Hall",
+  "guardian": [12.0000000, 77.0000000],
+  "wearable": [12.0002400, 77.0001800],
+  "relay": [12.0002500, 77.0001900],
+  "bounds": [11.9999000, 76.9999000, 12.0003700, 77.0005300],
+  "landmarks": [
+    {"name": "Welcome Desk", "point": [12.0000300, 77.0000400]},
+    {"name": "Blue Pavilion", "point": [12.0002800, 77.0002100]}
+  ]
+}

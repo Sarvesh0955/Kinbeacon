@@ -35,6 +35,7 @@ class KinBeaconAdvertiserService : Service() {
     
     companion object {
         const val ACTION_START = "ACTION_START"
+        const val ACTION_START_DEMO = "ACTION_START_DEMO"
         const val ACTION_STOP = "ACTION_STOP"
         const val EXTRA_FRAMING_MODE = "EXTRA_FRAMING_MODE"
         
@@ -76,12 +77,41 @@ class KinBeaconAdvertiserService : Service() {
             wakeLock?.acquire(10 * 60 * 1000L /*10 minutes max just in case*/)
             
             startBroadcastingLoop()
+        } else if (intent?.action == ACTION_START_DEMO) {
+            stopBroadcastingLoop()
+            startForegroundServiceWithNotification()
+            startDemoHeartbeat()
         } else if (intent?.action == ACTION_STOP) {
             stopBroadcastingLoop()
             stopSelf()
         }
         
         return START_STICKY
+    }
+
+    private val demoCallback = object : AdvertiseCallback() {
+        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+            getSystemService(NotificationManager::class.java)
+                ?.notify(NOTIFICATION_ID, createNotification("Wearable demo heartbeat"))
+            broadcastTelemetry(radioState = "Wearable heartbeat active")
+        }
+
+        override fun onStartFailure(errorCode: Int) {
+            broadcastTelemetry(radioState = "Wearable heartbeat failed ($errorCode)")
+        }
+    }
+
+    private fun startDemoHeartbeat() {
+        val started = runCatching {
+            val advertiser = bluetoothAdapter?.bluetoothLeAdvertiser ?: return@runCatching false
+            advertiser.startAdvertising(
+                demoAdvertiseSettings(),
+                demoAdvertiseData(DEMO_HEARTBEAT_COMPANY, demoHeartbeat),
+                demoCallback
+            )
+            true
+        }.getOrDefault(false)
+        if (!started) broadcastTelemetry(radioState = "Enable Bluetooth and reopen Wearable Demo")
     }
 
     private fun startForegroundServiceWithNotification() {
@@ -249,6 +279,7 @@ class KinBeaconAdvertiserService : Service() {
                 null
             }
             try {
+                advertiser?.stopAdvertising(demoCallback)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activeAdvertisingSet != null) {
                     advertiser?.stopAdvertisingSet(advertisingSetCallback)
                     activeAdvertisingSet = null

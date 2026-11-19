@@ -17,6 +17,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { SearchResponse } from '../api/types';
 import { getErrorMessage } from '../api/client';
 import toast from 'react-hot-toast';
+import { LastMileDemo } from '../components/common/LastMileDemo';
 
 export const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -82,6 +83,8 @@ export const SearchPage: React.FC = () => {
         title="Device Location Detection"
         description="Query the anchor fleet concurrently, aggregate Bluetooth RSSI logs, and estimate zone position."
       />
+
+      <LastMileDemo />
 
       {/* Search Bar & Options */}
       <div className="p-6 rounded-xl bg-white border border-slate-200/80 shadow-sm">

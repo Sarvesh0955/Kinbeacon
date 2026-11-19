@@ -7,6 +7,7 @@ import time
 
 import config
 from api.routes import create_app
+from ble.demo import DemoRadio
 from ble.scanner import start_scanner_thread
 from db.store import SignalStore
 from scheduler.purge import PurgeScheduler
@@ -94,6 +95,9 @@ def main():
         action="store_true",
         help="Run in mock BLE mode (generates simulated signals for testing without radio)",
     )
+    parser.add_argument("--demo-server", help="Venue server URL for the last-mile demo")
+    parser.add_argument("--demo-adapter", default="hci0", help="BlueZ adapter for demo TX")
+    parser.add_argument("--demo-mock-tx", action="store_true", help="Log demo transmissions without a Linux radio")
     args = parser.parse_args()
 
     logger.info("==================================================")
@@ -120,6 +124,12 @@ def main():
     )
     scheduler.start()
 
+    demo = None
+    demo_thread = None
+    if args.demo_server:
+        demo = DemoRadio(args.demo_server, args.demo_adapter, args.mock or args.demo_mock_tx)
+        demo_thread = demo.start(stop_event)
+
     # 3. Launch BLE Scanner or Mock Ingestor
     scanner = None
     ble_thread = None
@@ -133,6 +143,7 @@ def main():
             stop_event=stop_event,
             device_prefix=args.prefix,
             company_id=args.company_id,
+            demo_receiver=demo.receive if demo else None,
         )
 
     # 4. Create Flask API App
@@ -146,6 +157,8 @@ def main():
         scheduler.stop(timeout=2.0)
         if ble_thread and ble_thread.is_alive():
             ble_thread.join(timeout=3.0)
+        if demo_thread:
+            demo_thread.join(timeout=3.0)
         store.close()
         logger.info("KinBeacon Anchor shut down successfully.")
         sys.exit(0)

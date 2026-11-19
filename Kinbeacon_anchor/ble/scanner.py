@@ -28,8 +28,10 @@ class BLEScanner:
         device_prefix: str = config.DEVICE_PREFIX,
         company_id: int = config.COMPANY_ID,
         retry_interval: int = config.BLE_RETRY_INTERVAL_SECONDS,
+        demo_receiver=None,
     ):
         self.store = store
+        self.demo_receiver = demo_receiver
         self.device_prefix = device_prefix
         self.company_id = company_id
         self.retry_interval = retry_interval
@@ -114,6 +116,9 @@ class BLEScanner:
         Process a single BLE advertisement event.
         Returns the inserted record ID if matched and stored, None otherwise.
         """
+        if self.demo_receiver:
+            self.demo_receiver(advertisement_data)
+
         device_id = self.extract_device_id(device, advertisement_data)
         if not device_id:
             return None
@@ -175,13 +180,14 @@ def start_scanner_thread(
     stop_event: threading.Event,
     device_prefix: str = config.DEVICE_PREFIX,
     company_id: int = config.COMPANY_ID,
+    demo_receiver=None,
 ) -> Tuple[threading.Thread, BLEScanner]:
     """
     Launches BLEScanner on a dedicated background thread with its own asyncio event loop.
     Returns (thread, scanner_instance).
     """
     scanner = BLEScanner(
-        store=store, device_prefix=device_prefix, company_id=company_id
+        store=store, device_prefix=device_prefix, company_id=company_id, demo_receiver=demo_receiver
     )
 
     def _worker():
