@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.deps import get_transport
+from app.api.registration import router as registration_router
 from app.api.v1.demo import Demo, router as demo_router
 from app.api.v1.live_find import LiveFind, router as live_find_router
 from app.api.v1.router import api_v1_router
@@ -109,6 +110,7 @@ def create_app() -> FastAPI:
 
     app.state.demo = Demo()
     app.state.live_find = LiveFind()
+    app.include_router(registration_router)
     app.include_router(demo_router, prefix=settings.api_prefix)
     app.include_router(live_find_router, prefix=settings.api_prefix)
     app.include_router(api_v1_router, prefix=settings.api_prefix)
