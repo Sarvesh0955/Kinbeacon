@@ -1,12 +1,13 @@
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Set
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import Settings, settings as global_settings
+from app.core.config import ZONE_HISTORY_MINUTES, Settings, settings as global_settings
 from app.core.errors import EntityNotFoundError, NoActiveAnchorsError
 from app.models.entities import (
     Anchor,
     SearchAnchorResult,
+    SearchZoneHistory,
     Sighting,
     ZoneEstimate,
     to_utc,
@@ -23,6 +24,7 @@ from app.schemas.search import (
     SearchRequest,
     SearchResponse,
     ZoneCandidate,
+    ZoneHistoryEntry,
     ZoneRef,
 )
 from app.transport.base import AnchorTransport
@@ -150,19 +152,32 @@ class SearchService:
             )
 
         # 8. Run pure ZoneEngine
-        now = datetime.now(timezone.utc)
+        now = utcnow()
         estimate_res = self.zone_engine.estimate(
             sightings=chronological_sightings,
             anchors=anchor_meta_map,
             zones=zone_meta_map,
             now=now,
         )
+        zone_history = self._estimate_zone_history(
+            chronological_sightings, anchor_meta_map, zone_meta_map, now
+        )
+        if zone_history:
+            await self.search_repo.save_zone_history(
+                SearchZoneHistory(
+                    search_id=search.id,
+                    entries=[entry.model_dump(mode="json") for entry in zone_history],
+                )
+            )
 
         # 9. Persist sightings (cap raw sightings per anchor)
         sighting_db_rows: List[Sighting] = []
         by_anchor_counts: Dict[str, int] = {}
+        current_cutoff = now - timedelta(seconds=self.cfg.stale_max_s)
         # Reverse to get newest sightings first for persistence cap
         for s in reversed(chronological_sightings):
+            if to_utc(s.observed_at) < current_cutoff:
+                break
             c = by_anchor_counts.get(s.anchor_id, 0)
             if c < self.cfg.max_raw_sightings_persisted_per_anchor:
                 sighting_db_rows.append(
@@ -261,6 +276,7 @@ class SearchService:
             device_id=request.device_id,
             status=search.status,
             zone=zone_ref,
+            zone_history=zone_history,
             estimated_position=pos,
             confidence=estimate_res.confidence,
             confidence_label=estimate_res.confidence_label,
@@ -273,6 +289,31 @@ class SearchService:
             started_at=search.started_at,
             completed_at=search.completed_at,
         )
+
+    def _estimate_zone_history(
+        self,
+        sightings: List[RawSighting],
+        anchors: Dict[str, AnchorMetadata],
+        zones: Dict[int, ZoneMetadata],
+        now: datetime,
+    ) -> List[ZoneHistoryEntry]:
+        minute = timedelta(minutes=1)
+        window_start = now - ZONE_HISTORY_MINUTES * minute
+        buckets: Dict[int, List[RawSighting]] = {}
+        for sighting in sightings:
+            observed_at = to_utc(sighting.observed_at)
+            if window_start <= observed_at <= now:
+                index = min((observed_at - window_start) // minute, ZONE_HISTORY_MINUTES - 1)
+                buckets.setdefault(index, []).append(sighting)
+
+        history: List[ZoneHistoryEntry] = []
+        for index, bucket in sorted(buckets.items()):
+            minute_start = window_start + index * minute
+            estimate = self.zone_engine.estimate(bucket, anchors, zones, now=minute_start + minute)
+            zone = estimate.winning_zone
+            if zone and (not history or history[-1].id != zone.zone_id):
+                history.append(ZoneHistoryEntry(id=zone.zone_id, name=zone.name, minute_start=minute_start))
+        return history
 
     async def get_search(self, search_id: str) -> SearchResponse:
         search = await self.search_repo.get_by_id(search_id)
@@ -335,6 +376,7 @@ class SearchService:
             device_id=search.device_id,
             status=search.status,
             zone=zone_ref,
+            zone_history=search.zone_history.entries if search.zone_history else [],
             confidence=confidence,
             confidence_label=confidence_label,
             last_seen_at=last_seen,

@@ -91,6 +91,8 @@ Implements a side-effect-free mathematical scoring engine ([app/zoning/engine.py
 | `GET` / `PATCH` / `DELETE`| `/api/v1/devices/{device_id}` | Retrieve, update, or soft-delete wearable device |
 | `POST` | `/api/v1/admin/seed` | Seed entire venue (zones, adjacencies, anchors, devices) in one payload |
 
+Search responses include `zone` for the current estimate and `zone_history` for the preceding 15 minutes of anchor data. The same zone engine scores each one-minute interval. The history lists zone changes oldest first, skips minutes without a zone estimate, and collapses repeated zones across gaps. Each entry includes the zone `id`, `name`, and UTC `minute_start` of the first interval in that run.
+
 ---
 
 ## Getting Started

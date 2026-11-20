@@ -122,6 +122,14 @@ class Search(Base):
     results = relationship("SearchAnchorResult", back_populates="search", lazy="selectin", cascade="all, delete-orphan")
     sightings = relationship("Sighting", back_populates="search", lazy="selectin", cascade="all, delete-orphan")
     estimates = relationship("ZoneEstimate", back_populates="search", lazy="selectin", cascade="all, delete-orphan")
+    zone_history = relationship("SearchZoneHistory", lazy="selectin", uselist=False, cascade="all, delete-orphan")
+
+
+class SearchZoneHistory(Base):
+    __tablename__ = "search_zone_history"
+
+    search_id = Column(String(36), ForeignKey("searches.id", ondelete="CASCADE"), primary_key=True)
+    entries = Column(JSON, nullable=False)
 
 
 class SearchAnchorResult(Base):

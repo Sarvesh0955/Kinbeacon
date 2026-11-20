@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.entities import (
     Search,
     SearchAnchorResult,
+    SearchZoneHistory,
     Sighting,
     ZoneEstimate,
     utcnow,
@@ -55,8 +56,16 @@ class SearchRepository:
         self.session.add_all(estimates)
         await self.session.flush()
 
+    async def save_zone_history(self, history: SearchZoneHistory) -> None:
+        self.session.add(history)
+        await self.session.flush()
+
     async def purge_older_than(self, ttl_seconds: float) -> int:
         cutoff = utcnow() - timedelta(seconds=ttl_seconds)
+        expired_searches = select(Search.id).where(Search.started_at < cutoff)
+        await self.session.execute(
+            delete(SearchZoneHistory).where(SearchZoneHistory.search_id.in_(expired_searches))
+        )
         stmt = delete(Search).where(Search.started_at < cutoff)
         res = await self.session.execute(stmt)
         return res.rowcount

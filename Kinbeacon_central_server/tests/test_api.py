@@ -1,6 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import httpx
 import pytest
 from httpx import AsyncClient
+from app.transport.http import HttpAnchorTransport
 from app.zoning.models import RawSighting
 
 
@@ -147,6 +149,7 @@ async def test_searches_workflow(client: AsyncClient, mock_transport):
     assert resp_empty.status_code == 200
     empty_data = resp_empty.json()
     assert empty_data["zone"] is None
+    assert empty_data["zone_history"] == []
     assert empty_data["confidence"] == 0.0
     assert "NOT_SEEN" in empty_data["flags"]
 
@@ -181,6 +184,52 @@ async def test_searches_workflow(client: AsyncClient, mock_transport):
     resp_history = await client.get("/api/v1/devices/kb-phone1/searches")
     assert resp_history.status_code == 200
     assert len(resp_history.json()) >= 2
+
+
+async def test_search_returns_minute_zone_changes(client, mock_transport, monkeypatch):
+    for zone_id, name in enumerate(("A", "B", "C"), start=1):
+        response = await client.post("/api/v1/zones", json={"id": zone_id, "name": name})
+        assert response.status_code == 201
+        response = await client.post(
+            "/api/v1/anchors",
+            json={"anchor_id": name, "base_url": f"http://{name.lower()}.test", "zone_id": zone_id},
+        )
+        assert response.status_code == 201
+    response = await client.post("/api/v1/devices", json={"device_id": "wearable"})
+    assert response.status_code == 201
+
+    now = datetime.now(timezone.utc)
+    ages_by_anchor = {
+        "a": (750, 630, 570, 90, 5),
+        "b": (510,),
+        "c": (930, 870, 450, 390, 330),
+    }
+
+    def anchor_response(request):
+        ages = ages_by_anchor[request.url.host[0]]
+        records = [
+            {"timestamp": (now - timedelta(seconds=age)).isoformat(), "rssi": -55}
+            for age in ages
+        ]
+        return httpx.Response(200, json={"records": records})
+
+    async with AsyncClient(transport=httpx.MockTransport(anchor_response)) as anchor_client:
+        transport = HttpAnchorTransport(client=anchor_client)
+        monkeypatch.setattr(mock_transport, "search_all", transport.search_all)
+        response = await client.post("/api/v1/searches", json={"device_id": "wearable"})
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["zone"] == {"id": 1, "name": "A"}
+    history = result["zone_history"]
+    assert [entry["name"] for entry in history] == ["C", "A", "B", "C", "A"]
+    assert [
+        datetime.fromisoformat(history[0]["minute_start"]) + timedelta(minutes=offset)
+        for offset in (0, 2, 6, 7, 13)
+    ] == [datetime.fromisoformat(entry["minute_start"]) for entry in history]
+    stored = await client.get(f"/api/v1/searches/{result['search_id']}")
+    assert stored.status_code == 200
+    assert stored.json()["zone_history"] == history
 
 
 @pytest.mark.asyncio

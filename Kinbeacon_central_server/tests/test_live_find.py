@@ -11,6 +11,24 @@ def auth(key):
     return {"Authorization": f"Bearer {key}"}
 
 
+def test_fixed_code_pairs_only_to_the_waiting_guardian():
+    client = TestClient(create_app())
+    first = client.post(BASE + "/sessions").json()
+    assert first["invite"] == "123456"
+    assert client.post(BASE + "/sessions").status_code == 409
+
+    pair = {"invite": "123456", "publisher_key": "a" * 43}
+    assert client.post(BASE + "/pair", json={**pair, "invite": "000000"}).status_code == 404
+    assert client.post(BASE + "/pair", json=pair).json() == {"session_id": first["session_id"]}
+
+    second = client.post(BASE + "/sessions").json()
+    assert second["invite"] == "123456"
+    assert client.post(BASE + "/pair", json=pair).json() == {"session_id": first["session_id"]}
+    assert client.post(BASE + "/pair", json={**pair, "publisher_key": "b" * 43}).json() == {
+        "session_id": second["session_id"],
+    }
+
+
 def test_paired_live_positions_update_only_for_the_guardian(monkeypatch):
     now = 1000.0
     monkeypatch.setattr(live_find, "monotonic", lambda: now)

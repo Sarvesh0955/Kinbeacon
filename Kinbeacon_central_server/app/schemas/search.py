@@ -45,11 +45,16 @@ class ZoneRef(BaseModel):
     name: str
 
 
+class ZoneHistoryEntry(ZoneRef):
+    minute_start: datetime
+
+
 class SearchResponse(BaseModel):
     search_id: str
     device_id: str
     status: str  # COMPLETED, PARTIAL, FAILED
     zone: Optional[ZoneRef] = None
+    zone_history: List[ZoneHistoryEntry] = Field(default_factory=list)
     estimated_position: Optional[EstimatedPosition] = None
     confidence: float
     confidence_label: str  # HIGH, MEDIUM, LOW

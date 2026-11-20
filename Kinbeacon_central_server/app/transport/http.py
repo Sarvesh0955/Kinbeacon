@@ -4,7 +4,7 @@ import time
 from typing import Any, Dict, List, Optional
 import httpx
 
-from app.core.config import Settings, settings as global_settings
+from app.core.config import ZONE_HISTORY_MINUTES, Settings, settings as global_settings
 from app.core.logging import logger
 from app.models.entities import Anchor
 from app.schemas.anchor import AnchorVerificationResult
@@ -180,6 +180,7 @@ class HttpAnchorTransport(AnchorTransport):
             # Parse and validate sightings
             parsed_sightings: List[RawSighting] = []
             dropped = 0
+            max_age_s = max(ZONE_HISTORY_MINUTES * 60, self.cfg.stale_max_s)
 
             for r in records:
                 rssi = r.get("rssi")
@@ -202,7 +203,7 @@ class HttpAnchorTransport(AnchorTransport):
                     continue
 
                 age = (now - ts).total_seconds()
-                if age > self.cfg.stale_max_s:
+                if age > max_age_s:
                     dropped += 1
                     continue
 

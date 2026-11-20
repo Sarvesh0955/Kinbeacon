@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
+ZONE_HISTORY_MINUTES = 15
+
 
 class Settings(BaseSettings):
     """Central server settings."""

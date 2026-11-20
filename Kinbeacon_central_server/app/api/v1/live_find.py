@@ -14,6 +14,7 @@ bearer = HTTPBearer(auto_error=False)
 Credential = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]
 PublisherKey = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{43}$")]
 
+PAIRING_CODE = "123456"
 INVITE_SECONDS = 5 * 60
 SESSION_SECONDS = 30 * 60
 GUARDIAN_IDLE_SECONDS = 60
@@ -21,7 +22,7 @@ MAX_SESSIONS = 128
 
 
 class Pair(BaseModel):
-    invite: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{22}$")]
+    invite: Annotated[str, Field(pattern=r"^[0-9]{6}$")]
     publisher_key: PublisherKey
 
 
@@ -37,7 +38,6 @@ class Position(BaseModel):
 class Session:
     id: str
     guardian_key: str
-    invite: str
     created_at: float
     guardian_seen_at: float
     publisher_key: str | None = None
@@ -82,14 +82,16 @@ async def create(request: Request, response: Response):
     live.expire()
     if len(live.sessions) >= MAX_SESSIONS:
         raise HTTPException(503, "Live Find is busy")
+    if any(session.publisher_key is None for session in live.sessions.values()):
+        raise HTTPException(409, "A Guardian session is already waiting to pair")
     now = monotonic()
-    session = Session(token_urlsafe(16), token_urlsafe(32), token_urlsafe(16), now, now)
+    session = Session(token_urlsafe(16), token_urlsafe(32), now, now)
     live.sessions[session.id] = session
     response.headers["Cache-Control"] = "no-store"
     return {
         "session_id": session.id,
         "guardian_key": session.guardian_key,
-        "invite": session.invite,
+        "invite": PAIRING_CODE,
     }
 
 
@@ -97,17 +99,23 @@ async def create(request: Request, response: Response):
 async def pair(data: Pair, request: Request, response: Response):
     live: LiveFind = request.app.state.live_find
     live.expire()
+    if not compare_digest(PAIRING_CODE, data.invite):
+        raise HTTPException(404, "Live Find pairing code unavailable")
+
+    waiting = None
     for session in live.sessions.values():
-        if not compare_digest(session.invite, data.invite):
-            continue
         if session.publisher_key is None:
-            session.publisher_key = data.publisher_key
-            session.guardian_seen_at = monotonic()
-        if compare_digest(session.publisher_key, data.publisher_key):
+            waiting = session
+        elif compare_digest(session.publisher_key, data.publisher_key):
             response.headers["Cache-Control"] = "no-store"
             return {"session_id": session.id}
-        break
-    raise HTTPException(404, "Live Find pairing code unavailable")
+    if waiting is None:
+        raise HTTPException(404, "Live Find pairing code unavailable")
+
+    waiting.publisher_key = data.publisher_key
+    waiting.guardian_seen_at = monotonic()
+    response.headers["Cache-Control"] = "no-store"
+    return {"session_id": waiting.id}
 
 
 @router.put("/sessions/{session_id}/position", status_code=204)
