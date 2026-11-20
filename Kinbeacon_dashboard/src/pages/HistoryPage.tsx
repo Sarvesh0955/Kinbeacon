@@ -5,6 +5,7 @@ import { getDeviceSearches, getSearch, listDevices } from '../api/endpoints';
 import { PageHeader, LoadingSpinner, EmptyState, ErrorBanner } from '../components/common/UIFeedback';
 import { Modal } from '../components/common/Modal';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { ZoneHistory } from '../components/common/ZoneHistory';
 import { getErrorMessage } from '../api/client';
 import toast from 'react-hot-toast';
 
@@ -215,6 +216,8 @@ export const HistoryPage: React.FC = () => {
                   {detailData.zone ? detailData.zone.name : 'None (NOT_SEEN)'}
                 </div>
               </div>
+
+              <ZoneHistory entries={detailData.zone_history} />
 
               {detailData.candidates && detailData.candidates.length > 0 && (
                 <div>

@@ -156,6 +156,10 @@ export interface ZoneRef {
   name: string;
 }
 
+export interface ZoneHistoryEntry extends ZoneRef {
+  minute_start: string;
+}
+
 export interface SearchRequestPayload {
   device_id: string;
   max_age_s?: number;
@@ -167,6 +171,7 @@ export interface SearchResponse {
   device_id: string;
   status: 'COMPLETED' | 'PARTIAL' | 'FAILED' | string;
   zone: ZoneRef | null;
+  zone_history?: ZoneHistoryEntry[];
   estimated_position: EstimatedPosition | null;
   confidence: number;
   confidence_label: 'HIGH' | 'MEDIUM' | 'LOW' | string;

@@ -14,6 +14,7 @@ import {
 import { executeSearch, listDevices } from '../api/endpoints';
 import { PageHeader, LoadingSpinner } from '../components/common/UIFeedback';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { ZoneHistory } from '../components/common/ZoneHistory';
 import { SearchResponse } from '../api/types';
 import { getErrorMessage } from '../api/client';
 import toast from 'react-hot-toast';
@@ -254,7 +255,7 @@ export const SearchPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-5 rounded-xl bg-gradient-to-br from-indigo-50/50 to-slate-50 border border-indigo-100">
                 <div>
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                    Detected Zone
+                    Current Zone
                   </span>
                   <div className="text-2xl font-black text-slate-900 mt-1 flex items-center gap-2">
                     <MapPin className="w-6 h-6 text-indigo-600 shrink-0" />
@@ -302,13 +303,14 @@ export const SearchPage: React.FC = () => {
             ) : (
               <div className="p-8 text-center rounded-xl bg-slate-50 border border-slate-200">
                 <HelpCircle className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-                <h3 className="text-base font-bold text-slate-800">Device Not Heard</h3>
+                <h3 className="text-base font-bold text-slate-800">Current Zone Unknown</h3>
                 <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                  None of the active anchors recorded BLE advertisements for device &quot;
-                  {searchResult.device_id}&quot; within the rolling retention window.
+                  The available anchor sightings did not establish a current zone.
                 </p>
               </div>
             )}
+
+            <ZoneHistory entries={searchResult.zone_history} />
 
             {/* Fleet Fan-Out Status Bar */}
             <div className="p-4 rounded-lg bg-slate-50 border border-slate-200/80 text-xs">
