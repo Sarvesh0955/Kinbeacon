@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.deps import get_transport
 from app.api.v1.demo import Demo, router as demo_router
+from app.api.v1.live_find import LiveFind, router as live_find_router
 from app.api.v1.router import api_v1_router
 from app.core.config import settings
 from app.core.errors import KinBeaconError
@@ -33,11 +34,12 @@ async def background_fleet_prober():
             logger.warning("Fleet prober tick failed: %s", e)
 
 
-async def background_ttl_purger():
+async def background_ttl_purger(live_find: LiveFind):
     """Periodically purges searches & sightings older than TTL."""
     while True:
         try:
             await asyncio.sleep(60.0)
+            live_find.expire()
             async with async_session_factory() as session:
                 repo = SearchRepository(session)
                 purged = await repo.purge_older_than(settings.retention_ttl_s)
@@ -58,7 +60,7 @@ async def lifespan(app: FastAPI):
 
     # Launch background tasks
     prober_task = asyncio.create_task(background_fleet_prober())
-    purger_task = asyncio.create_task(background_ttl_purger())
+    purger_task = asyncio.create_task(background_ttl_purger(app.state.live_find))
 
     logger.info("KinBeacon Central Server started successfully.")
     yield
@@ -106,7 +108,9 @@ def create_app() -> FastAPI:
         }
 
     app.state.demo = Demo()
+    app.state.live_find = LiveFind()
     app.include_router(demo_router, prefix=settings.api_prefix)
+    app.include_router(live_find_router, prefix=settings.api_prefix)
     app.include_router(api_v1_router, prefix=settings.api_prefix)
 
     return app
